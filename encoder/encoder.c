@@ -1214,7 +1214,7 @@ static int validate_parameters( x264_t *h, int b_open )
     if( b_open && (h->param.analyse.b_pvmaf || h->param.analyse.b_pvmaf_log))
     {
         x264_log( h, X264_LOG_INFO, "pVMAF tracks VQ loss due to compression (not scaling)\n" );
-        x264_log( h, X264_LOG_INFO, "pVMAF currently supports progressive FHD clips with pixel format YUV420p encoded in medium preset without --tune options\n" );
+        x264_log( h, X264_LOG_INFO, "pVMAF currently supports progressive FHD (1920x1080) clips with pixel format YUV420p encoded in medium preset without --tune options\n" );
         if( h->param.analyse.preset_id != 6)
         {
             x264_log( h, X264_LOG_WARNING, "--pvmaf used with preset that is NOT medium: results may not be accurate!\n" );
@@ -1225,7 +1225,7 @@ static int validate_parameters( x264_t *h, int b_open )
             x264_log( h, X264_LOG_WARNING, "--pvmaf used with --tune setting: results may not be accurate!\n" );
         }
 
-        if( h->param.i_width != 1080)
+        if( h->param.i_width != 1920)
         {
             x264_log( h, X264_LOG_WARNING, "--pvmaf used with resolution that is not 1920x1080: results may not be accurate! pVMAF tracks VQ loss due to compression and NOT scaling\n" );
         }
