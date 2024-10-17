@@ -117,7 +117,8 @@ Use this option to create a dump of CSV file with all candidate frame level feat
 **Caption:** Correlation Coefficients and Error Measures Between VMAF and Other FR Metrics
 
 #### Scatter plot - VMAF vs pVMAF
-![pvmaf-vs-vmaf](https://github-chf01.synamedia.com/adedecker/x264/assets/6236/49e881a5-6471-478c-80d8-2c9ea516bc8c)
+![pvmaf-vs-vmaf](https://github.com/user-attachments/assets/7a204e91-10b6-4c9e-977e-5f2c9c94cc18)
+
 
 
 #### Computational overhead analysis - Single-threaded execution with SIMD enabled
