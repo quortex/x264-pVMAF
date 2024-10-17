@@ -120,6 +120,7 @@ typedef struct x264_frame
     /* for adaptive B-frame decision.
      * contains the SATD cost of the lowres frame encoded in various modes
      * FIXME: how big an array do we need? */
+    // pVMAF - POE
     int     i_cost_est[X264_BFRAME_MAX+2][X264_BFRAME_MAX+2];
     int     i_cost_est_aq[X264_BFRAME_MAX+2][X264_BFRAME_MAX+2];
     int     i_satd; // the i_cost_est of the selected frametype
@@ -176,7 +177,7 @@ typedef struct x264_frame
     /* user frame properties */
     uint8_t *mb_info;
     void (*mb_info_free)( void* );
-
+    uint8_t scenecut_flag;
 #if HAVE_OPENCL
     x264_frame_opencl_t opencl;
 #endif

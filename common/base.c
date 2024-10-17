@@ -457,6 +457,8 @@ REALIGN_STACK void x264_param_default( x264_param_t *param )
     param->analyse.i_luma_deadzone[1] = 11;
     param->analyse.b_psnr = 0;
     param->analyse.b_ssim = 0;
+    param->analyse.b_pvmaf_features = 0;
+    param->analyse.b_pvmaf = 0;
 
     param->i_cqm_preset = X264_CQM_FLAT;
     memset( param->cqm_4iy, 16, sizeof( param->cqm_4iy ) );
@@ -513,6 +515,7 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->analyse.i_weighted_pred = X264_WEIGHTP_NONE;
         param->analyse.b_weighted_bipred = 0;
         param->rc.i_lookahead = 0;
+        param->analyse.preset_id = 1;
     }
     else if( !strcasecmp( preset, "superfast" ) )
     {
@@ -525,6 +528,7 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->rc.b_mb_tree = 0;
         param->analyse.i_weighted_pred = X264_WEIGHTP_SIMPLE;
         param->rc.i_lookahead = 0;
+        param->analyse.preset_id = 2;
     }
     else if( !strcasecmp( preset, "veryfast" ) )
     {
@@ -534,6 +538,7 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->analyse.i_trellis = 0;
         param->analyse.i_weighted_pred = X264_WEIGHTP_SIMPLE;
         param->rc.i_lookahead = 10;
+        param->analyse.preset_id = 3;
     }
     else if( !strcasecmp( preset, "faster" ) )
     {
@@ -542,6 +547,7 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->analyse.i_subpel_refine = 4;
         param->analyse.i_weighted_pred = X264_WEIGHTP_SIMPLE;
         param->rc.i_lookahead = 20;
+        param->analyse.preset_id = 4;
     }
     else if( !strcasecmp( preset, "fast" ) )
     {
@@ -549,10 +555,12 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->analyse.i_subpel_refine = 6;
         param->analyse.i_weighted_pred = X264_WEIGHTP_SIMPLE;
         param->rc.i_lookahead = 30;
+        param->analyse.preset_id = 5;
     }
     else if( !strcasecmp( preset, "medium" ) )
     {
         /* Default is medium */
+        param->analyse.preset_id = 6;
     }
     else if( !strcasecmp( preset, "slow" ) )
     {
@@ -561,6 +569,7 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->analyse.i_direct_mv_pred = X264_DIRECT_PRED_AUTO;
         param->analyse.i_trellis = 2;
         param->rc.i_lookahead = 50;
+        param->analyse.preset_id = 7;
     }
     else if( !strcasecmp( preset, "slower" ) )
     {
@@ -572,6 +581,7 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->analyse.inter |= X264_ANALYSE_PSUB8x8;
         param->analyse.i_trellis = 2;
         param->rc.i_lookahead = 60;
+        param->analyse.preset_id = 8;
     }
     else if( !strcasecmp( preset, "veryslow" ) )
     {
@@ -585,6 +595,7 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->analyse.i_trellis = 2;
         param->i_bframe = 8;
         param->rc.i_lookahead = 60;
+        param->analyse.preset_id = 9;
     }
     else if( !strcasecmp( preset, "placebo" ) )
     {
@@ -599,6 +610,7 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->analyse.i_trellis = 2;
         param->i_bframe = 16;
         param->rc.i_lookahead = 60;
+        param->analyse.preset_id = 10;
     }
     else
     {
@@ -619,6 +631,7 @@ static int param_apply_tune( x264_param_t *param, const char *tune )
             param->i_deblocking_filter_alphac0 = -1;
             param->i_deblocking_filter_beta = -1;
             param->analyse.f_psy_trellis = 0.15;
+            param->analyse.tune_id = 1;
         }
         else if( len == 9 && !strncasecmp( tune, "animation", 9 ) )
         {
@@ -629,6 +642,7 @@ static int param_apply_tune( x264_param_t *param, const char *tune )
             param->analyse.f_psy_rd = 0.4;
             param->rc.f_aq_strength = 0.6;
             param->i_bframe += 2;
+            param->analyse.tune_id = 2;
         }
         else if( len == 5 && !strncasecmp( tune, "grain", 5 ) )
         {
@@ -643,6 +657,7 @@ static int param_apply_tune( x264_param_t *param, const char *tune )
             param->analyse.i_luma_deadzone[0] = 6;
             param->analyse.i_luma_deadzone[1] = 6;
             param->rc.f_qcompress = 0.8;
+            param->analyse.tune_id = 3;
         }
         else if( len == 10 && !strncasecmp( tune, "stillimage", 10 ) )
         {
@@ -652,18 +667,21 @@ static int param_apply_tune( x264_param_t *param, const char *tune )
             param->analyse.f_psy_rd = 2.0;
             param->analyse.f_psy_trellis = 0.7;
             param->rc.f_aq_strength = 1.2;
+            param->analyse.tune_id = 4;
         }
         else if( len == 4 && !strncasecmp( tune, "psnr", 4 ) )
         {
             if( psy_tuning_used++ ) goto psy_failure;
             param->rc.i_aq_mode = X264_AQ_NONE;
             param->analyse.b_psy = 0;
+            param->analyse.tune_id = 5;
         }
         else if( len == 4 && !strncasecmp( tune, "ssim", 4 ) )
         {
             if( psy_tuning_used++ ) goto psy_failure;
             param->rc.i_aq_mode = X264_AQ_AUTOVARIANCE;
             param->analyse.b_psy = 0;
+            param->analyse.tune_id = 6;
         }
         else if( len == 10 && !strncasecmp( tune, "fastdecode", 10 ) )
         {
@@ -671,6 +689,7 @@ static int param_apply_tune( x264_param_t *param, const char *tune )
             param->b_cabac = 0;
             param->analyse.b_weighted_bipred = 0;
             param->analyse.i_weighted_pred = X264_WEIGHTP_NONE;
+            param->analyse.tune_id = 7;
         }
         else if( len == 11 && !strncasecmp( tune, "zerolatency", 11 ) )
         {
@@ -680,6 +699,7 @@ static int param_apply_tune( x264_param_t *param, const char *tune )
             param->b_sliced_threads = 1;
             param->b_vfr_input = 0;
             param->rc.b_mb_tree = 0;
+            param->analyse.tune_id = 8;
         }
         else if( len == 6 && !strncasecmp( tune, "touhou", 6 ) )
         {
@@ -691,6 +711,7 @@ static int param_apply_tune( x264_param_t *param, const char *tune )
             param->rc.f_aq_strength = 1.3;
             if( param->analyse.inter & X264_ANALYSE_PSUB16x16 )
                 param->analyse.inter |= X264_ANALYSE_PSUB8x8;
+            param->analyse.tune_id = 9;
         }
         else
         {
@@ -1374,6 +1395,13 @@ REALIGN_STACK int x264_param_parse( x264_param_t *p, const char *name, const cha
         p->analyse.b_psnr = atobool(value);
     OPT("ssim")
         p->analyse.b_ssim = atobool(value);
+    OPT("pvmaf")
+    {
+        assert(X264_CHROMA_FORMAT == X264_CSP_I420);
+        assert(X264_BIT_DEPTH == 8);
+        assert(X264_INTERLACED == 0);
+        p->analyse.b_pvmaf = atobool(value);
+    }
     OPT("aud")
         p->b_aud = atobool(value);
     OPT("sps-id")

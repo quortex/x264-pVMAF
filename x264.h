@@ -396,7 +396,9 @@ typedef struct x264_param_t
     int         i_log_level;
     int         b_full_recon;   /* fully reconstruct frames, even when not necessary for encoding.  Implied by psz_dump_yuv */
     char        *psz_dump_yuv;  /* filename (in UTF-8) for reconstructed frames */
-
+    // char        *feature_filename; /* Feature filename for pVMAF */
+    FILE        *feature_file;  /* Feature file for pVMAF */
+    FILE        *pvmaf_log_file; /* Log file for pVMAF */
     /* Encoder analyser parameters */
     struct
     {
@@ -432,6 +434,11 @@ typedef struct x264_param_t
 
         int          b_psnr;    /* compute and print PSNR stats */
         int          b_ssim;    /* compute and print SSIM stats */
+        int          b_pvmaf_features; /* compute and print pVMAF features */
+        int          b_pvmaf;   /* compute and print pVMAF stats */
+        int          b_pvmaf_log;
+        int          preset_id;
+        int          tune_id;
     } analyse;
 
     /* Rate control parameters */
@@ -854,6 +861,7 @@ typedef struct x264_image_properties_t
     double f_psnr_avg;
     /* Out: PSNR of Y, U, and V (if x264_param_t.b_psnr is set) */
     double f_psnr[3];
+    float f_pvmaf;
 
     /* Out: Average effective CRF of the encoded frame */
     double f_crf_avg;

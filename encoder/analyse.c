@@ -2912,6 +2912,117 @@ static inline void mb_analyse_qp_rd( x264_t *h, x264_mb_analysis_t *a )
     }
 }
 
+static void init_mb_costs(x264_t *h)
+{
+    // Init can also be done to costmax
+    h->mb.costs.i_satd_i16x16 = 0;
+    h->mb.costs.i_satd_i8x8 = 0;
+    h->mb.costs.i_satd_i4x4 = 0;
+    h->mb.costs.i_satd_pcm = 0;
+
+    h->mb.costs.i_cost_inter = 0;
+    h->mb.costs.i_cost_intra = 0;
+    h->mb.costs.i_bcost_rd = 0;
+
+    h->mb.costs.i_cost_b_frame = 0;
+
+    h->mb.costs.i_ssd_luma = 0;
+    h->mb.costs.i_ssd_chroma = 0;
+    h->mb.costs.i_ssd_full = 0;
+}
+
+static void mb_cache_costs(x264_t *h, x264_mb_analysis_t *a)
+{
+    init_mb_costs(h);
+    switch( h->mb.i_type )
+    {
+        case I_4x4:
+            h->mb.costs.i_cost_intra = a->i_satd_i4x4; //add chroma if needed
+            break;
+        case I_8x8:
+            h->mb.costs.i_cost_intra = a->i_satd_i8x8;
+            break;
+        case I_16x16:
+            h->mb.costs.i_cost_intra = a->i_satd_i16x16;
+            break;
+        case I_PCM:
+            h->mb.costs.i_cost_intra = a->i_satd_pcm;
+            break;
+        case P_L0:
+            h->mb.costs.i_cost_intra = X264_MIN3( a->i_satd_i16x16,
+                                      a->i_satd_i8x8,
+                                      a->i_satd_i4x4 ); //add chroma if needed
+            h->mb.costs.i_cost_intra = X264_MIN(h->mb.costs.i_cost_intra, a->i_satd_pcm);
+            switch( h->mb.i_partition )
+            {
+                case D_16x16:
+                    h->mb.costs.i_cost_inter = a->l0.me16x16.cost;
+                    break;
+
+                case D_16x8:
+                    h->mb.costs.i_cost_inter = a->l0.me16x8[0].cost + a->l0.me16x8[1].cost;
+                    break;
+
+                case D_8x16:
+                    h->mb.costs.i_cost_inter = a->l0.me8x16[0].cost + a->l0.me8x16[1].cost;
+                    break;
+
+                default:
+                    x264_log( h, X264_LOG_ERROR, "internal error P_L0 and partition=%d\n", h->mb.i_partition );
+                    break;
+            }
+            break;
+
+        case P_8x8:
+            h->mb.costs.i_cost_inter = a->l0.i_cost8x8; //Add analysis for sub 4x4
+            break;
+
+        case P_SKIP:
+        {
+            h->mb.costs.i_cost_inter = 0;
+            break;
+        }
+
+        case B_SKIP:
+            h->mb.costs.i_cost_b_frame = 0;
+            break;
+        case B_DIRECT:
+            h->mb.costs.i_cost_b_frame = a->i_cost16x16direct;
+            break;
+        case B_8x8:
+            h->mb.costs.i_cost_b_frame = a->i_cost8x8bi;
+            break;
+
+
+        default: /* the rest of the B types */
+            switch( h->mb.i_partition )
+            {
+            case D_16x16:
+                switch( h->mb.i_type )
+                {
+                case B_L0_L0:
+                    h->mb.costs.i_cost_b_frame = a->l0.me16x16.cost;
+                    break;
+                case B_L1_L1:
+                    h->mb.costs.i_cost_b_frame = a->l1.me16x16.cost;
+                    break;
+                case B_BI_BI:
+                    h->mb.costs.i_cost_b_frame = a->i_cost16x16bi;
+                    break;
+                }
+                break;
+            case D_16x8:
+                h->mb.costs.i_cost_b_frame = a->i_cost16x8bi;
+                break;
+            case D_8x16:
+                h->mb.costs.i_cost_b_frame = a->i_cost8x16bi;
+                break;
+            default:
+                x264_log( h, X264_LOG_ERROR, "internal error (invalid MB type)\n" );
+                break;
+            }
+    }
+}
 /*****************************************************************************
  * x264_macroblock_analyse:
  *****************************************************************************/
@@ -3041,6 +3152,7 @@ skip_analysis:
             {
                 for( int i = 1; i < h->mb.pic.i_fref[0]; i++ )
                     M32( h->mb.mvr[0][i][h->mb.i_mb_xy] ) = 0;
+                mb_cache_costs(h, &analysis);
                 return;
             }
 
@@ -3381,9 +3493,9 @@ skip_analysis:
             /* select best inter mode */
             /* direct must be first */
             if( analysis.b_direct_available )
-                mb_analyse_inter_direct( h, &analysis );
+                mb_analyse_inter_direct( h, &analysis ); //a->i_cost16x16direct , a->i_cost8x8direct[i]
 
-            mb_analyse_inter_b16x16( h, &analysis );
+            mb_analyse_inter_b16x16( h, &analysis ); //a->i_cost16x16bi, a->l0.me16x16.cost, a->l1.me16x16.cost
 
             if( h->mb.i_type == B_SKIP )
             {
@@ -3391,6 +3503,8 @@ skip_analysis:
                     M32( h->mb.mvr[0][i][h->mb.i_mb_xy] ) = 0;
                 for( int i = 1; i < h->mb.pic.i_fref[1]; i++ )
                     M32( h->mb.mvr[1][i][h->mb.i_mb_xy] ) = 0;
+
+                mb_cache_costs(h, &analysis);
                 return;
             }
 
@@ -3411,6 +3525,7 @@ skip_analysis:
                 {
                     h->mb.i_type = B_SKIP;
                     analyse_update_cache( h, &analysis );
+                    mb_cache_costs(h, &analysis);
                     return;
                 }
             }
@@ -3728,6 +3843,9 @@ skip_analysis:
         psy_trellis_init( h, 0 );
     if( h->mb.b_trellis == 1 || h->mb.b_noise_reduction )
         h->mb.i_skip_intra = 0;
+
+    mb_cache_costs(h, &analysis);
+
 }
 
 /*-------------------- Update MB from the analysis ----------------------*/
