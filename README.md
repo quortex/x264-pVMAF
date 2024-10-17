@@ -15,7 +15,7 @@
     - [Performance Analysis](#performance)
       - [Model Performance Analysis](#model-performance---medium-preset---frame-level-predictions)
       - [Scatter plot - VMAF vs pVMAF](#scatter-plot---vmaf-vs-pvmaf)
-      - [Computational Overhead Analysis](#computational-overhead-analysis---single-threaded-execution-with-simd-enabled)
+      - [Computational Overhead Analysis](#computational-overhead-analysis---single-threaded-execution-with-simd-enabled---medium-preset)
   - [What is the purpose of this activity?](#what-is-the-purpose-of-this-activity)
   - [Contributors](#contributors)
   - [Acknowledgements](#acknowledgements)
@@ -78,21 +78,25 @@ If your source is of a resolution larger than FHD, we recommend resizing it to F
 ```bash
 ffmpeg -f rawvideo -pixel_format yuv420p -video_size 3840x2160 -i 4Kinput.yuv -s 1920x1080 -pix_fmt yuv420p FHDoutput.yuv
 ```
+Looking for a quick compatible source to try it out? Here you go,
+```bash
+wget https://media.xiph.org/video/av2/y4m/WorldCupFarSky_1920x1080_30p.y4m -O input.y4m
+```
 #### Enable pVMAF with `--pvmaf`
 This argument is used to enable pVMAF inference during the encoding process. To view frame level stats, use it along with `-v` or `--verbose`  and `--log-level debug`.
 ```bash
-./x264 --input-res  1920x1080  --crf 20  --input-csp  i420  --fps  60 -o output.264  input.y4m --threads 10 --pvmaf --preset medium --verbose --log-level debug
+./x264 --input-res  1920x1080  --crf 20  --input-csp  i420  --fps  30 -o output.264  input.y4m --threads 10 --pvmaf --preset medium --verbose --log-level debug
 ```
 #### Generate pVMAF log file with `-l`
 Use this option to write frame level pVMAF scores onto a CSV file.
 ```bash
-./x264 --input-res  1920x1080  --crf 20  --input-csp  i420  --fps  60 -l pVMAF_score_log.csv -o output.264  input.y4m --threads 10 --pvmaf --preset medium --verbose --log-level debug
+./x264 --input-res  1920x1080  --crf 20  --input-csp  i420  --fps  30 -l pVMAF_score_log.csv -o output.264  input.y4m --threads 10 --pvmaf --preset medium --verbose --log-level debug
 ```
 The log file contains display picture number along with QP, frame type and pVMAF score.
 #### Generate candidate features with `-g`
 Use this option to create a dump of CSV file with all candidate frame level features. We recommend using this option with `--pvmaf` and `--psnr`.
 ```bash
-./x264 --input-res  1920x1080  --crf 20  --input-csp  i420  --fps  60 -g feature_file.csv -o output.264  input.y4m --threads 10 --pvmaf --psnr --preset medium --verbose --log-level debug
+./x264 --input-res  1920x1080  --crf 20  --input-csp  i420  --fps  30 -g feature_file.csv -o output.264  input.y4m --threads 10 --pvmaf --psnr --preset medium --verbose --log-level debug
 ```
 ## About
 ### Performance
