@@ -147,7 +147,7 @@ Our motivation for this work is to advance research on perception based video qu
 - Dr. Jan De Cock - Director of Codec Development, CTO Office, Synamedia
 
 ### Acknowledgements
-This research was supported by Synamedia. We extend our gratitude to Professor Glenn Van Wallendael of Ghent University---imec for his insightful guidance. Additionally, we thank the following individuals for their contributions to the pVMAF project, in no particular order: Hsiang-Yeh Wang, Yongjian Li, Chris Warrington, Steve Warrington, John Lan, Chris Coene, Marc Baillavoine (Synamedia), Longji Wang, Marcus Rosen, Lin Zheng, and Cheng-Yu Pai (formerly with Synamedia). We would also like to thank the creators and contributors of x264 repository.
+This research was supported by Synamedia. We extend our gratitude to Professor Glenn Van Wallendael of Ghent University---imec for his insightful guidance. Additionally, we thank the following individuals for their contributions to the pVMAF project, in no particular order: Hsiang-Yeh Wang, Yongjian Li, Chris Warrington, Steve Warrington, John Lan, Chris Coene, Marc Baillavoine, Karl Stoll (Synamedia), Longji Wang, Marcus Rosen, Lin Zheng, and Cheng-Yu Pai (formerly with Synamedia). We would also like to thank the creators and contributors of x264 repository.
 
 ### Development Notes
 **pVMAF v1.2** : This version of pVMAF model is optimized and tuned for FHD progressive content with pixel format YUV420p encoded on `--medium` preset settings without any of the `--tune` options. With development process still on-going for tuning the model preformance on a wider range of settings, please expect changes to the model weights.
