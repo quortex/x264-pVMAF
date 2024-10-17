@@ -121,7 +121,7 @@ Use this option to create a dump of CSV file with all candidate frame level feat
 
 
 
-#### Computational overhead analysis - Single-threaded execution with SIMD enabled
+#### Computational overhead analysis - Single-threaded execution with SIMD enabled - Medium preset
 | **Preset**   | **Metric** | **Time per frame (ms)** | **Overhead cycles (%)** |
 |--------------|------------|-------------------------|--------------------------|
 | Medium       | PSNR       | 0.54                    | 0.43                     |
