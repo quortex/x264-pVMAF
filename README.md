@@ -120,7 +120,7 @@ Use this option to create a dump of CSV file with all candidate frame level feat
 ![pvmaf-vs-vmaf](https://github.com/user-attachments/assets/7a204e91-10b6-4c9e-977e-5f2c9c94cc18)
 
 
-#### Computational overhead analysis - Single-threaded execution with SIMD enabled
+#### Computational overhead analysis - Single-threaded execution with SIMD enabled - Medium preset
 | **Preset**   | **Metric** | **Time per frame (ms)** | **Overhead cycles (%)** |
 |--------------|------------|-------------------------|--------------------------|
 | Medium       | PSNR       | 0.54                    | 0.43                     |
