@@ -35,6 +35,7 @@
 #if HAVE_INTEL_DISPATCHER
 #include "extras/intel_dispatcher.h"
 #endif
+#include "pvmaf.h"
 
 //#define DEBUG_MB_TYPE
 
@@ -1184,6 +1185,7 @@ static int validate_parameters( x264_t *h, int b_open )
         h->param.analyse.b_psnr = 0;
         h->param.analyse.b_ssim = 0;
     }
+
     /* Warn users trying to measure PSNR/SSIM with psy opts on. */
     if( b_open && (h->param.analyse.b_psnr || h->param.analyse.b_ssim) )
     {
@@ -1206,6 +1208,27 @@ static int validate_parameters( x264_t *h, int b_open )
         }
         if( s )
             x264_log( h, X264_LOG_WARNING, "--tune %s should be used if attempting to benchmark %s!\n", s, s );
+    }
+
+    /* Warn users trying to measure pVMAF with settings it is not tuned on. */
+    if( b_open && (h->param.analyse.b_pvmaf || h->param.analyse.b_pvmaf_log))
+    {
+        x264_log( h, X264_LOG_INFO, "pVMAF tracks VQ loss due to compression (not scaling)\n" );
+        x264_log( h, X264_LOG_INFO, "pVMAF currently supports progressive FHD clips with pixel format YUV420p encoded in medium preset without --tune options\n" );
+        if( h->param.analyse.preset_id != 6)
+        {
+            x264_log( h, X264_LOG_WARNING, "--pvmaf used with preset that is NOT medium: results may not be accurate!\n" );
+        }
+
+        if( h->param.analyse.tune_id > 0)
+        {
+            x264_log( h, X264_LOG_WARNING, "--pvmaf used with --tune setting: results may not be accurate!\n" );
+        }
+
+        if( h->param.i_width != 1080)
+        {
+            x264_log( h, X264_LOG_WARNING, "--pvmaf used with resolution that is not 1920x1080: results may not be accurate! pVMAF tracks VQ loss due to compression and NOT scaling\n" );
+        }
     }
 
     if( !h->param.analyse.b_psy )
@@ -1397,6 +1420,7 @@ static int validate_parameters( x264_t *h, int b_open )
     BOOLIFY( analyse.b_psy );
     BOOLIFY( analyse.b_psnr );
     BOOLIFY( analyse.b_ssim );
+    BOOLIFY( analyse.b_pvmaf);
     BOOLIFY( rc.b_stat_write );
     BOOLIFY( rc.b_stat_read );
     BOOLIFY( rc.b_mb_tree );
@@ -2512,6 +2536,13 @@ static void fdec_filter_row( x264_t *h, int mb_y, int pass )
                 h->stat.frame.i_ssd[2] += ssd_v;
             }
         }
+        else if( h->param.analyse.b_pvmaf )
+        {
+            h->stat.frame.i_ssd[0] += x264_pixel_ssd_wxh( &h->pixf,
+                h->fdec->plane[0] + minpix_y * h->fdec->i_stride[0], h->fdec->i_stride[0],
+                h->fenc->plane[0] + minpix_y * h->fenc->i_stride[0], h->fenc->i_stride[0],
+                h->param.i_width, maxpix_y-minpix_y );
+        }
 
         if( h->param.analyse.b_ssim )
         {
@@ -2982,6 +3013,17 @@ cont:
             continue;
         }
 
+        // Compute ME costs feature
+        h->stat.frame.i_cost_intra      += h->mb.costs.i_cost_intra;
+        h->stat.frame.i_cost_inter      += h->mb.costs.i_cost_inter;
+        h->stat.frame.i_cost_b_frame    += h->mb.costs.i_cost_b_frame;
+
+
+        h->stat.frame.gmv_abs[0][0]         += abs(h->mb.cache.mv[0][x264_scan8[0]][0]); // L0  x
+        h->stat.frame.gmv_abs[0][1]         += abs(h->mb.cache.mv[0][x264_scan8[0]][1]); // L0  y
+        h->stat.frame.gmv_abs[1][0]         += abs(h->mb.cache.mv[1][x264_scan8[0]][0]); // L1  x
+        h->stat.frame.gmv_abs[1][1]         += abs(h->mb.cache.mv[1][x264_scan8[0]][1]); // L1  y
+
         /* accumulate mb stats */
         h->stat.frame.i_mb_count[h->mb.i_type]++;
 
@@ -3272,6 +3314,17 @@ static int threaded_slices_write( x264_t *h )
             h->stat.frame.i_ssd[j] += t->stat.frame.i_ssd[j];
         h->stat.frame.f_ssim += t->stat.frame.f_ssim;
         h->stat.frame.i_ssim_cnt += t->stat.frame.i_ssim_cnt;
+
+        //pVMAF features accumulate from threads
+
+        h->stat.frame.i_cost_intra      += t->stat.frame.i_cost_intra;
+        h->stat.frame.i_cost_inter      += t->stat.frame.i_cost_inter;
+        h->stat.frame.i_cost_b_frame    += t->stat.frame.i_cost_b_frame;
+
+        h->stat.frame.gmv_abs[0][0]         += t->stat.frame.gmv_abs[0][0];
+        h->stat.frame.gmv_abs[0][1]         += t->stat.frame.gmv_abs[0][1];
+        h->stat.frame.gmv_abs[1][0]         += t->stat.frame.gmv_abs[1][0];
+        h->stat.frame.gmv_abs[1][1]         += t->stat.frame.gmv_abs[1][1];
     }
 
     return 0;
@@ -4126,8 +4179,120 @@ static int encoder_frame_end( x264_t *h, x264_t *thread_current,
         int msg_len = strlen(psz_message);
         snprintf( psz_message + msg_len, 80 - msg_len, " SSIM Y:%.5f", pic_out->prop.f_ssim );
     }
-    psz_message[79] = '\0';
+    if( h->param.analyse.b_pvmaf )
+    {
+        double psnr_y;
+        float pvmaf, feature[input_dim_pvmaf];
+        float blurDec, blurEnc, siDec, siEnc;
+        int l0_gmv_x_abs, l0_gmv_y_abs, l1_gmv_x_abs, l1_gmv_y_abs, gmv_abs;
+        float numMB = ((h->param.i_width * h->param.i_height)>>8);
+        // calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec);
+        // calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc);
+        // calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &siEnc);
+        // calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &siDec);
+        calculate_si_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec, &siDec);
+        calculate_si_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc, &siEnc);
+        l0_gmv_x_abs = (h->stat.frame.gmv_abs[0][0]);
+        l0_gmv_y_abs = (h->stat.frame.gmv_abs[0][1]);
+        l1_gmv_x_abs = (h->stat.frame.gmv_abs[1][0]);
+        l1_gmv_y_abs = (h->stat.frame.gmv_abs[1][1]);
+        gmv_abs = X264_MAX(abs(l0_gmv_x_abs)+abs(l0_gmv_y_abs), abs(l1_gmv_x_abs)+abs(l1_gmv_y_abs));
 
+        if (!( h->param.analyse.b_psnr ))
+        {
+            // Compute Luma PSNR
+            int luma_size = h->param.i_width * h->param.i_height;
+            psnr_y = calc_psnr( h->stat.frame.i_ssd[0], luma_size );
+            feature[psnr_y_codec_pvmaf] = (float) psnr_y;
+        }
+        else
+        {
+            feature[psnr_y_codec_pvmaf] = (float)(pic_out->prop.f_psnr[0]);
+        }
+
+        // Motion Approx Compute
+        x264_frame_t *closest_frame = NULL, *closest_prev_frame, *closest_future_frame;
+        closest_prev_frame = get_closest_previous_frame(h);
+        closest_future_frame = get_closest_future_frame(h);
+        float motion_offset = 0, motion_approx = -1;
+
+        if (closest_prev_frame)
+        {
+            if (closest_future_frame)
+            {
+                closest_frame = (h->fenc->i_frame - closest_prev_frame->i_frame) <= (closest_future_frame->i_frame - h->fenc->i_frame)?closest_prev_frame:closest_future_frame;
+                motion_offset = abs(h->fenc->i_frame - closest_frame->i_frame);
+            }
+            else
+            {
+                closest_frame = closest_prev_frame;
+                motion_offset = h->fenc->i_frame - closest_frame->i_frame;
+            }
+        }
+        else if (closest_future_frame)
+        {
+            closest_frame = closest_future_frame;
+            motion_offset = closest_frame->i_frame - h->fenc->i_frame;
+        }
+
+        motion_approx = (closest_frame)?SAD_AVX2(h->fdec->plane[0], closest_frame->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height):-1;
+
+
+        // Collect features
+        feature[frame_qp_pvmaf] = (float) h->fdec->f_qp_avg_aq;
+
+        feature[pa_blurriness2_pvmaf] = blurEnc;
+        feature[blurriness2_pvmaf] = blurDec;
+        feature[blurriness_ratio_pvmaf] = (blurEnc>0)?(blurDec/blurEnc):0;
+
+        feature[pa_spatial_information2_pvmaf]   = siEnc;
+        feature[spatial_information2_pvmaf]   = siDec;
+        feature[spatial_information_ratio_pvmaf]   = (siEnc>0)?siDec/siEnc:0;
+
+        feature[frame_size_pvmaf] = (float)(frame_size/numMB);
+        feature[i_ME_cost_intra_pvmaf] = (float) (h->stat.frame.i_cost_intra);
+        feature[i_ME_cost_inter_pvmaf] = (float) (h->stat.frame.i_cost_inter);
+        feature[i_ME_cost_B_frame_pvmaf] = (float) (h->stat.frame.i_cost_b_frame);
+
+        feature[global_motion_abs_pvmaf] = (float) (gmv_abs/numMB);
+        feature[motion_approximation_pvmaf] = (float) (motion_approx/numMB);
+        feature[offset_pvmaf] = (float) (motion_offset);
+
+        feature[num_intra_macroblocks_pvmaf] = (float) (h->stat.frame.i_mb_count_i/numMB);
+        feature[num_inter_macroblocks_pvmaf] = (float) (h->stat.frame.i_mb_count_p/numMB);
+        feature[num_skip_macroblocks_pvmaf ] = (float) (h->stat.frame.i_mb_count_skip/numMB);
+
+        feature[i_frame_pvmaf] = (float) (h->sh.i_type == SLICE_TYPE_I? 1.0 : 0.0);
+        feature[p_frame_pvmaf] = (float) (h->sh.i_type == SLICE_TYPE_P? 1.0 : 0.0);
+        feature[b_frame_pvmaf] = (float) (h->sh.i_type == SLICE_TYPE_B? 1.0 : 0.0);
+
+
+        feature[DUMMY_0_pvmaf] = (float)0.0;
+        feature[DUMMY_1_pvmaf] = (float)0.0;
+        feature[DUMMY_2_pvmaf] = (float)0.0;
+
+        compute_pvmaf(feature, &pvmaf);
+        pic_out->prop.f_pvmaf = x264_clip3f(pvmaf, 0.0, 1.0) * 100;
+
+        h->stat.f_pvmaf_mean[h->sh.i_type] += pic_out->prop.f_pvmaf * dur;
+
+        int msg_len = strlen(psz_message);
+        snprintf( psz_message + msg_len, 80 - msg_len, " pVMAF:%.2f", pic_out->prop.f_pvmaf );
+
+        if ( h->param.analyse.b_pvmaf_log )
+        {
+            if (h->param.pvmaf_log_file)
+                fprintf(h->param.pvmaf_log_file,"%d,%f,%c,%f\n",
+                h->fenc->i_frame, // DispPicNum
+                h->fdec->f_qp_avg_aq, // QP
+                h->sh.i_type == SLICE_TYPE_I ? 'I' : (h->sh.i_type == SLICE_TYPE_P ? 'P' : 'B' ), // Frame type
+                pic_out->prop.f_pvmaf // pVMAF
+                );
+        }
+    }
+
+    psz_message[79] = '\0';
+// Check here for any changes
     x264_log( h, X264_LOG_DEBUG,
               "frame=%4d QP=%.2f NAL=%d Slice:%c Poc:%-3d I:%-4d P:%-4d SKIP:%-4d size=%d bytes%s\n",
               h->i_frame,
@@ -4140,6 +4305,107 @@ static int encoder_frame_end( x264_t *h, x264_t *thread_current,
               h->stat.frame.i_mb_count_skip,
               frame_size,
               psz_message );
+
+    if (h->param.analyse.b_pvmaf_features)
+    {
+        // Warning : Don't forget to add feature file header in x264.c file, search for case 'g':
+
+        // Collect blurriness feature
+        float blurDec1, blurEnc1, blurDec2, blurEnc2, siEnc1, siDec1, siEnc2, siDec2;
+        calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 1, &siEnc1);
+        calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 1, &siDec1);
+        calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &siEnc2);
+        calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &siDec2);
+        calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 1, &blurDec1);
+        calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 1, &blurEnc1);
+        calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec2);
+        calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc2);
+
+
+        x264_frame_t *closest_prev_frame, *closest_future_frame;
+        closest_prev_frame = get_closest_previous_frame(h);
+        closest_future_frame = get_closest_future_frame(h);
+
+        int64_t i_motion_approx_prev_dec = -1, i_motion_approx_prev_enc = -1;
+        int i_motion_approx_prev_offset = 0;
+        if (closest_prev_frame)
+        {
+            i_motion_approx_prev_dec = SAD_AVX2(h->fdec->plane[0], closest_prev_frame->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
+            i_motion_approx_prev_enc = SAD_AVX2(h->fenc->plane[0], closest_prev_frame->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
+            i_motion_approx_prev_offset = h->fenc->i_frame - closest_prev_frame->i_frame;
+        }
+
+        int64_t i_motion_approx_future_dec = -1, i_motion_approx_future_enc = -1;
+        int i_motion_approx_future_offset = 0;
+        if (closest_future_frame)
+        {
+            i_motion_approx_future_dec = SAD_AVX2(h->fdec->plane[0], closest_future_frame->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
+            i_motion_approx_future_enc = SAD_AVX2(h->fenc->plane[0], closest_future_frame->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
+            i_motion_approx_future_offset = h->fenc->i_frame - closest_future_frame->i_frame;
+        }
+
+        int l0_gmv_x_abs, l0_gmv_y_abs, l1_gmv_x_abs, l1_gmv_y_abs, gmv_abs;
+        l0_gmv_x_abs = (h->stat.frame.gmv_abs[0][0]);
+        l0_gmv_y_abs = (h->stat.frame.gmv_abs[0][1]);
+        l1_gmv_x_abs = (h->stat.frame.gmv_abs[1][0]);
+        l1_gmv_y_abs = (h->stat.frame.gmv_abs[1][1]);
+        gmv_abs = X264_MAX((l0_gmv_x_abs)+(l0_gmv_y_abs), (l1_gmv_x_abs)+(l1_gmv_y_abs));
+
+        FILE *pvmaf_features = h->param.feature_file;
+        if (pvmaf_features)
+        {
+            //                      1  2   3  4  5  6  7  8  9 10 11 12  13  14  15  16  17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32  33  34  35 36 37  38 39 40 41 42 43 44 45
+            fprintf(pvmaf_features,"%d,%d,%f,%c,%f,%f,%f,%f,%d,%d,%d,%d,%ld,%ld,%ld,%ld,%ld,%f,%f,%f,%f,%d,%d,%d,%d,%f,%f,%f,%f,%d,%d,%d,%ld,%ld,%d,%ld,%ld,%d,%d,%d,%d,%d,%d,%d,%f\n",
+
+            h->i_frame, // 1 Stream Frame number
+            h->fenc->i_frame, // 2 Display pic number
+            h->fdec->f_qp_avg_aq, // 3 QP
+            h->sh.i_type == SLICE_TYPE_I ? 'I' : (h->sh.i_type == SLICE_TYPE_P ? 'P' : 'B' ), // 4 Frame type
+            pic_out->prop.f_psnr[0], // 5 PSNR Y
+            pic_out->prop.f_psnr[1],// 6 PSNR U
+            pic_out->prop.f_psnr[2],// 7 PSNR V
+            pic_out->prop.f_ssim,// 8 SSIM Y
+            h->param.i_width,// 9
+            h->param.i_height, // 10
+            h->fdec->i_satd, // 11
+            (h->fenc->i_intra_cost)?*(h->fenc->i_intra_cost):0, // 12
+            h->stat.frame.i_SC_enc[0], // 13
+            h->stat.frame.i_SC_dec[0], // 14
+            h->stat.frame.i_cost_intra, // 15
+            h->stat.frame.i_cost_inter, // 16
+            h->stat.frame.i_cost_b_frame, // 17
+            blurEnc1, // 18
+            blurDec1, // 19
+            blurEnc2, // 20
+            blurDec2, // 21
+            (h->param.i_width * h->param.i_height)>>8, // 22 mb count
+            -1,// gmv, // 23 gmv
+            gmv_abs, // 24 gmv_abs
+            frame_size, // 25 frame size in bytes
+            siEnc1, // 26 Spatial Information Enc step = 1
+            siDec1, // 27 Spatial Information Dec step = 1
+            siEnc2, // 28 Spatial Information Enc step = 2
+            siDec2, // 29 Spatial Information Dec step = 2
+            -1,// i_motion_approx_dec, // 30 Motion Approx  Dec Current Frame - Prev_frame
+            -1,// i_motion_approx_enc, // 31 Motion Approx  Enc Current Frame - Prev_frame
+            -1,// i_motion_approx_offset, // 32 curr_frame_number - prev_frame_number
+            i_motion_approx_prev_dec, // 33 Motion Approx  Dec Current Frame - Prev_frame
+            i_motion_approx_prev_enc, // 34 Motion Approx  Enc Current Frame - Prev_frame
+            i_motion_approx_prev_offset, // 35 curr_frame_number - prev_frame_number
+            i_motion_approx_future_dec, // 36 Motion Approx  Dec Current Frame - Prev_frame
+            i_motion_approx_future_enc, // 37 Motion Approx  Enc Current Frame - Prev_frame
+            i_motion_approx_future_offset, // 38 curr_frame_number - future_frame_number
+            h->stat.frame.i_mb_count_i, // 39 MB count for I type
+            h->stat.frame.i_mb_count_p, // 40 MB count for P type
+            h->stat.frame.i_mb_count_skip, // 41 MB count for SKIP type
+            h->fenc->scenecut_flag & (h->sh.i_type == SLICE_TYPE_I), // 42 MB count for SKIP type
+            h->param.analyse.i_subpel_refine, // 43 sub pel ME for scaling mvs
+            (h->param.analyse.i_subpel_refine == 0)?1:(((h->param.analyse.i_subpel_refine == 1)||(h->param.analyse.i_subpel_refine == 2))?2:4),
+            pic_out->prop.f_pvmaf // 44 pvmaf
+            );
+        }
+    }
+
 
     // keep stats all in one place
     thread_sync_stat( h->thread[0], h );
@@ -4244,12 +4510,12 @@ void    x264_encoder_close  ( x264_t *h )
             if( h->param.analyse.b_psnr )
             {
                 x264_log( h, X264_LOG_INFO,
-                          "frame %c:%-5d Avg QP:%5.2f  size:%6.0f  PSNR Mean Y:%5.2f U:%5.2f V:%5.2f Avg:%5.2f Global:%5.2f\n",
+                          "frame %c:%-5d Avg QP:%5.2f  size:%6.0f pVMAF Mean:%.2f  PSNR Mean Y:%5.2f U:%5.2f V:%5.2f Avg:%5.2f Global:%5.2f\n",
                           slice_type_to_char[i_slice],
                           i_count,
                           h->stat.f_frame_qp[i_slice] / i_count,
                           (double)h->stat.i_frame_size[i_slice] / i_count,
-                          h->stat.f_psnr_mean_y[i_slice] / dur, h->stat.f_psnr_mean_u[i_slice] / dur, h->stat.f_psnr_mean_v[i_slice] / dur,
+                          h->stat.f_pvmaf_mean[i_slice] / dur, h->stat.f_psnr_mean_y[i_slice] / dur, h->stat.f_psnr_mean_u[i_slice] / dur, h->stat.f_psnr_mean_v[i_slice] / dur,
                           h->stat.f_psnr_average[i_slice] / dur,
                           calc_psnr( h->stat.f_ssd_global[i_slice], dur * i_yuv_size ) );
             }
@@ -4492,6 +4758,11 @@ void    x264_encoder_close  ( x264_t *h )
         {
             float ssim = SUM3( h->stat.f_ssim_mean_y ) / duration;
             x264_log( h, X264_LOG_INFO, "SSIM Mean Y:%.7f (%6.3fdb)\n", ssim, calc_ssim_db( ssim ) );
+        }
+        if( h->param.analyse.b_pvmaf )
+        {
+            float pvmaf = SUM3( h->stat.f_pvmaf_mean ) / duration;
+            x264_log( h, X264_LOG_INFO, "pVMAF Mean :%.2f \n", pvmaf );
         }
         if( h->param.analyse.b_psnr )
         {

@@ -265,6 +265,18 @@ typedef struct
     int64_t i_ssd[3];
     double f_ssim;
     int i_ssim_cnt;
+    float f_pvmaf;
+    /*pVMAF Features*/
+    int64_t i_SC_enc[3];
+    int64_t i_SC_dec[3];
+    int64_t i_sad[3];
+    int64_t i_motion_score[3];
+    int64_t i_cost_intra;
+    int64_t i_cost_inter;
+    int64_t i_cost_b_frame;
+    int gmv[2][2]; //[ (L0/L1) ][ (x/y) ]
+    int gmv_abs[2][2]; //[ (L0/L1) ][ (x/y) ]
+    // int scenecut_flag;
 } x264_frame_stat_t;
 
 struct x264_t
@@ -650,6 +662,24 @@ struct x264_t
             uint8_t (*deblock_strength)[8][4];
         } cache;
 
+        struct
+        {
+            int i_satd_i16x16;
+            int i_satd_i8x8;
+            int i_satd_i4x4;
+            int i_satd_pcm;
+
+            int i_cost_inter;
+            int i_cost_intra;
+            int i_bcost_rd;
+
+            int i_cost_b_frame;
+
+            int i_ssd_luma;
+            int i_ssd_chroma;
+            int i_ssd_full;
+        } costs;
+
         /* */
         int     i_qp;       /* current qp */
         int     i_chroma_qp;
@@ -685,11 +715,11 @@ struct x264_t
     struct
     {
         /* Cumulated stats */
-
+        // pVMAF - POE
         /* per slice info */
         int     i_frame_count[3];
         int64_t i_frame_size[3];
-        double  f_frame_qp[3];
+        double  f_frame_qp[3]; // pVMAF - POE
         int     i_consecutive_bframes[X264_BFRAME_MAX+1];
         /* */
         double  f_ssd_global[3];
@@ -698,6 +728,7 @@ struct x264_t
         double  f_psnr_mean_u[3];
         double  f_psnr_mean_v[3];
         double  f_ssim_mean_y[3];
+        double  f_pvmaf_mean[3];
         double  f_frame_duration[3];
         /* */
         int64_t i_mb_count[3][19];

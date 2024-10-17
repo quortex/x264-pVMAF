@@ -1423,6 +1423,7 @@ static int scenecut_internal( x264_t *h, x264_mb_analysis_t *a, x264_frame_t **f
                   frame->i_frame,
                   icost, pcost, 1. - (double)pcost / icost,
                   f_bias, i_gop_size, imb, pmb );
+        frame->scenecut_flag = 1;
     }
     return res;
 }

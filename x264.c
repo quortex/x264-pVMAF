@@ -1008,7 +1008,7 @@ typedef enum
     OPT_RANGE
 } OptionsOPT;
 
-static char short_options[] = "8A:B:b:f:hI:i:m:o:p:q:r:t:Vvw";
+static char short_options[] = "8A:B:b:f:g:hI:i:l:m:o:p:q:r:t:Vvw";
 static struct option long_options[] =
 {
     { "help",                 no_argument,       NULL, 'h' },
@@ -1038,6 +1038,8 @@ static struct option long_options[] =
     { "no-deblock",           no_argument,       NULL, 0 },
     { "filter",               required_argument, NULL, 0 },
     { "deblock",              required_argument, NULL, 'f' },
+    { "feature-file",         required_argument, NULL, 'g' },
+    { "pvmaf-log-file",       required_argument, NULL, 'l' },
     { "interlaced",           no_argument,       NULL, OPT_INTERLACED },
     { "tff",                  no_argument,       NULL, OPT_INTERLACED },
     { "bff",                  no_argument,       NULL, OPT_INTERLACED },
@@ -1127,6 +1129,7 @@ static struct option long_options[] =
     { "cpu-independent",      no_argument,       NULL, 0 },
     { "psnr",                 no_argument,       NULL, 0 },
     { "ssim",                 no_argument,       NULL, 0 },
+    { "pvmaf",                 no_argument,       NULL, 0 },
     { "quiet",                no_argument,       NULL, OPT_QUIET },
     { "verbose",              no_argument,       NULL, 'v' },
     { "log-level",            required_argument, NULL, OPT_LOG_LEVEL },
@@ -1440,7 +1443,6 @@ static int parse( int argc, char **argv, x264_param_t *param, cli_opt_t *opt )
         int long_options_index = -1;
 
         int c = getopt_long( argc, argv, short_options, long_options, &long_options_index );
-
         if( c == -1 )
         {
             break;
@@ -1468,6 +1470,24 @@ static int parse( int argc, char **argv, x264_param_t *param, cli_opt_t *opt )
                 break;
             case 'o':
                 output_filename = optarg;
+                break;
+            case 'g':
+                assert(X264_CHROMA_FORMAT == X264_CSP_I420);
+                assert(X264_BIT_DEPTH == 8);
+                assert(X264_INTERLACED == 0);
+                param->feature_file = x264_fopen(optarg, "w");
+                param->analyse.b_pvmaf_features = 1;
+                param->analyse.b_psnr = 1;
+                //                                   1          2           3       4           5      6      7    8       9            10          11           12                   13                   14                       15               16            17               18       19        20          21           22           23                  24          25        26     27        28       29                30               31                32                        33                   34                      35                         36                     37                         38                     39             40            41             42            43              44          45
+                fprintf(param->feature_file,"StreamFrameNum,frame_number,frame_qp,frame_type,PSNR_Y,PSNR_U,PSNR_V,SSIM,frame_width,frame_height,i_dec_SATD,i_enc_intra_cost,Y_spatial_complexity_enc,Y_spatial_complexity_dec,i_ME_cost_intra,i_ME_cost_inter,i_ME_cost_B_frame,blurEnc_Y1,blurDec_Y1,blurEnc_Y2,blurDec_Y2,i_numMB,i_global_motion,i_global_motion_abs,frame_size,Y_siEnc1,Y_siDec1,Y_siEnc2,Y_siDec2,Y_MotionApprox_Dec,Y_MotionApprox_Enc,Y_MotionApprox_Offset,Y_MotionApprox_Prev_Dec,Y_MotionApprox_Prev_Enc,Y_MotionApprox_Prev_Offset,Y_MotionApprox_Future_Dec,Y_MotionApprox_Future_Enc,Y_MotionApprox_Future_Offset,i_I_MB_Count,i_P_MB_Count,i_SKIP_MB_Count,i_scenecut,i_subpel_refine,i_mv_multiplier,i_pVMAF\n");
+                break;
+            case 'l':
+                assert(X264_CHROMA_FORMAT == X264_CSP_I420);
+                assert(X264_BIT_DEPTH == 8);
+                assert(X264_INTERLACED == 0);
+                param->pvmaf_log_file = x264_fopen(optarg, "w");
+                param->analyse.b_pvmaf_log = 1;
+                fprintf(param->pvmaf_log_file,"frame_number,frame_qp,frame_type,pvmaf\n");
                 break;
             case OPT_MUXER:
                 FAIL_IF_ERROR( parse_enum_name( optarg, x264_muxer_names, &muxer ), "Unknown muxer `%s'\n", optarg );

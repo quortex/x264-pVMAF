@@ -215,6 +215,7 @@ static const char * const opts_standalone[] =
     "--thread-input",
     "--verbose", "-v",
     "--weightb",
+    "--pvmaf",
     NULL
 };
 
