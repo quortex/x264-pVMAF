@@ -4186,12 +4186,12 @@ static int encoder_frame_end( x264_t *h, x264_t *thread_current,
         float blurDec, blurEnc, siDec, siEnc;
         int l0_gmv_x_abs, l0_gmv_y_abs, l1_gmv_x_abs, l1_gmv_y_abs, gmv_abs;
         float numMB = ((h->param.i_width * h->param.i_height)>>8);
-        // calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec);
-        // calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc);
-        // calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &siEnc);
-        // calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &siDec);
-        calculate_si_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec, &siDec);
-        calculate_si_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc, &siEnc);
+        calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec);
+        calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc);
+        calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &siEnc);
+        calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &siDec);
+        // calculate_si_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec, &siDec);
+        // calculate_si_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc, &siEnc);
         l0_gmv_x_abs = (h->stat.frame.gmv_abs[0][0]);
         l0_gmv_y_abs = (h->stat.frame.gmv_abs[0][1]);
         l1_gmv_x_abs = (h->stat.frame.gmv_abs[1][0]);
