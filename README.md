@@ -17,6 +17,7 @@
       - [Scatter plot - VMAF vs pVMAF](#scatter-plot---vmaf-vs-pvmaf)
       - [Computational Overhead Analysis](#computational-overhead-analysis---single-threaded-execution-with-simd-enabled---medium-preset)
   - [What is the purpose of this activity?](#what-is-the-purpose-of-this-activity)
+  - [Branch Details](#branch-details)
   - [Contributors](#contributors)
   - [Acknowledgements](#acknowledgements)
   - [Development Notes](#development-notes)
@@ -145,6 +146,10 @@ Use this option to create a dump of CSV file with all candidate frame level feat
 
 ### What is the purpose of this activity?
 Our motivation for this work is to advance research on perception based video quality metrics tailored for real-time applications. We encourage the community to explore and evaluate pVMAF within the x264 framework. Additionally, we have made all candidate features accessible, inviting further experimentation and the extension of support to a broader range of encoder settings and content types.
+
+### Branch Details
+The branch **master** is upstreamed to [mirror/x264](https://github.com/mirror/x264/tree/master)\
+The branch **proper** is upstreamed to [videoLAN/x264](https://code.videolan.org/videolan/x264)
 
 ### Contributors
 - Axel De Decker - Software Engineer, CTO Office, Synamedia
