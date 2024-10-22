@@ -25,7 +25,7 @@
   - [Citation](#citation)
 
 ## What is pVMAF?
-VMAF has become the industry standard for evaluating video quality, but its computational demands can hinder its use in real-time applications. To address this, we've developed pVMAF (predicted VMAF), a more efficient method that closely approximates VMAF's quality predictions in capturing VQ loss due to compression. pVMAF uses a simplified neural network and computationally optimized features combined with information available in the encoding process to  produce quality predictions in real-time without sacrificing accuracy. We've kept pVMAF integration into x264 to be as non-intrusive as possible with no changes to the behaviour and the execution flow of x264.
+VMAF has become the industry standard for evaluating video quality, but its computational demands can hinder its use in real-time applications. To address this, we've developed pVMAF (predictive VMAF), a more efficient method that closely approximates VMAF's quality predictions in capturing VQ loss due to compression. pVMAF uses a simplified neural network and computationally optimized features combined with information available in the encoding process to  produce quality predictions in real-time without sacrificing accuracy. We've kept pVMAF integration into x264 to be as non-intrusive as possible with no changes to the behaviour and the execution flow of x264.
 
 **⚠️ Note: pVMAF currently supports Full-HD (1920x1080) progressive content with YUV420p pixel format encoded on `--medium` preset. With experiments and development still on-going to expand support for more configurations, expect changes to model weights**.
 
