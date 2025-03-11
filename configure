@@ -975,7 +975,12 @@ if [ $asm = auto -a \( $ARCH = X86 -o $ARCH = X86_64 \) ] ; then
     fi
     cc_check '' '' '__asm__("pabsw %xmm0, %xmm0");' && define HAVE_X86_INLINE_ASM
     define HAVE_MMX
-    CFLAGS="$CFLAGS -mavx -mavx2 -msse3 -mfma"
+    if (lscpu | grep -qi "sse3")  && (lscpu | grep -qi "avx2") && (lscpu | grep -qi "avx") ; then
+        CFLAGS="$CFLAGS -mavx -mavx2 -msse3 -mfma"
+        define PVMAF_SIMD
+    else
+        echo "SIMD (SSE/AVX) is NOT supported."
+    fi
 fi
 
 if [ $asm = auto -a $ARCH = ARM ] ; then

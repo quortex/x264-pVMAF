@@ -1,7 +1,7 @@
 #include "pvmaf.h"
 #include <math.h>
 
-#if (HAVE_MMX)
+#if (PVMAF_SIMD)
   #define _SIMD_
 #else
   #undef _SIMD_
