@@ -1,12 +1,12 @@
 #pragma once
 
 #include "common/common.h"
-#include <immintrin.h>    // AVX/AVX2
 #include "pvmaf_ml_model.h"
 #include "../config.h"
 
-#if (HAVE_MMX)
+#if (PVMAF_SIMD)
 
+#include <immintrin.h>    // AVX/AVX2
 #define XMM                               __m128i
 #define YMM                               __m256i
 #define XMMf                              __m128
