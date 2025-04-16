@@ -32,10 +32,10 @@ VMAF has become the industry standard for evaluating video quality, but its comp
 
 Link to the research paper -> *coming soon!*
 
-Check out our blog series on Video Quality Measurements,
+Check out our blog series on Video Quality Measurements:
   - [Part 1 - A Brief History on Video Quality Measurements](https://www.synamedia.com/blog/a-brief-history-of-video-quality-measurement-from-psnr-to-vmaf-and-beyond/)
   - [Part 2 - Real-time Video Quality Assessment with pVMAF](https://www.synamedia.com/blog/real-time-video-quality-assessment-with-pvmaf/)
-  - Part 3 - *coming soon*
+  - [Part 3 - Unlocking Real-Time Video Quality Measurement with x264-pVMAF](https://www.synamedia.com/blog/unlocking-real-time-video-quality-measurement-with-x264-pvmaf/)
 ## Requirements
 - gcc 5.0 or higher
 - nasm-2.13 or higher
@@ -152,7 +152,7 @@ The branch **master** is upstreamed to [mirror/x264](https://github.com/mirror/x
 The branch **proper** is upstreamed to [videoLAN/x264](https://code.videolan.org/videolan/x264)
 
 ### Contributors
-- Axel De Decker - Software Engineer, CTO Office, Synamedia
+- Axel De Decker - Senior Software Engineer, CTO Office, Synamedia
 - Sangar Sivashanmugam - Senior Video Algorithm Engineer, Research & Development, Synamedia
 - Jan Codenie - Senior Lead Software Engineer, CTO Office, Synamedia
 - Dr. Jan De Cock - Director of Codec Development, CTO Office, Synamedia
