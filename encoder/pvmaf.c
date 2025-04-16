@@ -20,6 +20,21 @@ void x264_pvmaf_init( uint32_t cpu, x264_pvmaf_functions_t *vqmf )
     vqmf->SAD_pvmaf = SAD_pvmaf_avx2;
   }
 #endif
+/*
+TO DO...
+
+#if (HAVE_AARCH64)
+  if (cpu & X264_CPU_NEON)
+  {
+    vqmf->calculate_blurriness = calculate_blurriness_neon;
+    vqmf->calculate_si = calculate_si_neon;
+    vqmf->ModelInference = ModelInference_neon;
+    vqmf->NormalizeInput = NormalizeInput_neon;
+    vqmf->ClipInput = ClipInput_neon;
+    vqmf->SAD_pvmaf = SAD_pvmaf_neon;
+  }
+#endif
+*/
 }
 
 x264_frame_t* get_closest_previous_frame(x264_t *h)
@@ -461,6 +476,10 @@ void calculate_blurriness_avx2(pixel* src, int pitch, int width, int height, int
   *blur = (float)var_sum/(size-1);
 }
 
+#endif
+
+#if(HAVE_AARCH64)
+// TO DO
 #endif
 
 // Compute pVMAF

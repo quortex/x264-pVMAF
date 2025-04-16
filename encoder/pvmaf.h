@@ -36,6 +36,12 @@ int64_t SAD_pvmaf_avx2(pixel* sour, pixel* dist, int pitch, int width, int heigh
 
 #endif
 
+#if(HAVE_AARCH64)
+
+// TO DO
+
+#endif
+
 void compute_pvmaf(x264_t *h, float *feature, float *pvmaf);
 
 x264_frame_t* get_previous_frame(x264_t *h);
