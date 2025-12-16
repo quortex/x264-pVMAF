@@ -1213,7 +1213,7 @@ static int validate_parameters( x264_t *h, int b_open )
     /* Warn users trying to measure pVMAF with settings it is not tuned on. */
     if( b_open && (h->param.analyse.b_pvmaf || h->param.analyse.b_pvmaf_log))
     {
-        x264_log( h, X264_LOG_INFO, "pVMAF tracks VQ loss due to compression (not scaling)\n" );
+        x264_log( h, X264_LOG_INFO, "This version of pVMAF tracks VQ loss due to compression (not scaling)\n" );
         x264_log( h, X264_LOG_INFO, "pVMAF currently supports progressive FHD (1920x1080) clips with pixel format YUV420p encoded in medium preset without --tune options\n" );
         if( h->param.analyse.preset_id != 6)
         {
