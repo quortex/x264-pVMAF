@@ -1689,6 +1689,7 @@ x264_t *x264_encoder_open( x264_param_t *param, void *api )
     x264_quant_init( h, h->param.cpu, &h->quantf );
     x264_deblock_init( h->param.cpu, &h->loopf, PARAM_INTERLACED );
     x264_bitstream_init( h->param.cpu, &h->bsf );
+    x264_pvmaf_init( h->param.cpu, &h->pvmaf_f );
     if( h->param.b_cabac )
         x264_cabac_init( h );
     else
@@ -4186,10 +4187,10 @@ static int encoder_frame_end( x264_t *h, x264_t *thread_current,
         float blurDec, blurEnc, siDec, siEnc;
         int l0_gmv_x_abs, l0_gmv_y_abs, l1_gmv_x_abs, l1_gmv_y_abs, gmv_abs;
         float numMB = ((h->param.i_width * h->param.i_height)>>8);
-        calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec);
-        calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc);
-        calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &siEnc);
-        calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &siDec);
+        h->pvmaf_f.calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec);
+        h->pvmaf_f.calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc);
+        h->pvmaf_f.calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &siEnc);
+        h->pvmaf_f.calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &siDec);
         // calculate_si_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec, &siDec);
         // calculate_si_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc, &siEnc);
         l0_gmv_x_abs = (h->stat.frame.gmv_abs[0][0]);
@@ -4235,7 +4236,7 @@ static int encoder_frame_end( x264_t *h, x264_t *thread_current,
             motion_offset = closest_frame->i_frame - h->fenc->i_frame;
         }
 
-        motion_approx = (closest_frame)?SAD_AVX2(h->fdec->plane[0], closest_frame->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height):-1;
+        motion_approx = (closest_frame)?h->pvmaf_f.SAD_pvmaf(h->fdec->plane[0], closest_frame->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height):-1;
 
 
         // Collect features
@@ -4271,7 +4272,7 @@ static int encoder_frame_end( x264_t *h, x264_t *thread_current,
         feature[DUMMY_1_pvmaf] = (float)0.0;
         feature[DUMMY_2_pvmaf] = (float)0.0;
 
-        compute_pvmaf(feature, &pvmaf);
+        compute_pvmaf(h, feature, &pvmaf);
         pic_out->prop.f_pvmaf = x264_clip3f(pvmaf, 0.0, 1.0) * 100;
 
         h->stat.f_pvmaf_mean[h->sh.i_type] += pic_out->prop.f_pvmaf * dur;
@@ -4312,14 +4313,14 @@ static int encoder_frame_end( x264_t *h, x264_t *thread_current,
 
         // Collect blurriness feature
         float blurDec1, blurEnc1, blurDec2, blurEnc2, siEnc1, siDec1, siEnc2, siDec2;
-        calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 1, &siEnc1);
-        calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 1, &siDec1);
-        calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &siEnc2);
-        calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &siDec2);
-        calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 1, &blurDec1);
-        calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 1, &blurEnc1);
-        calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec2);
-        calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc2);
+        h->pvmaf_f.calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 1, &siEnc1);
+        h->pvmaf_f.calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 1, &siDec1);
+        h->pvmaf_f.calculate_si(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &siEnc2);
+        h->pvmaf_f.calculate_si(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &siDec2);
+        h->pvmaf_f.calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 1, &blurDec1);
+        h->pvmaf_f.calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 1, &blurEnc1);
+        h->pvmaf_f.calculate_blurriness(h->fdec->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurDec2);
+        h->pvmaf_f.calculate_blurriness(h->fenc->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height, 2, &blurEnc2);
 
 
         x264_frame_t *closest_prev_frame, *closest_future_frame;
@@ -4330,8 +4331,8 @@ static int encoder_frame_end( x264_t *h, x264_t *thread_current,
         int i_motion_approx_prev_offset = 0;
         if (closest_prev_frame)
         {
-            i_motion_approx_prev_dec = SAD_AVX2(h->fdec->plane[0], closest_prev_frame->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
-            i_motion_approx_prev_enc = SAD_AVX2(h->fenc->plane[0], closest_prev_frame->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
+            i_motion_approx_prev_dec = h->pvmaf_f.SAD_pvmaf(h->fdec->plane[0], closest_prev_frame->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
+            i_motion_approx_prev_enc = h->pvmaf_f.SAD_pvmaf(h->fenc->plane[0], closest_prev_frame->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
             i_motion_approx_prev_offset = h->fenc->i_frame - closest_prev_frame->i_frame;
         }
 
@@ -4339,8 +4340,8 @@ static int encoder_frame_end( x264_t *h, x264_t *thread_current,
         int i_motion_approx_future_offset = 0;
         if (closest_future_frame)
         {
-            i_motion_approx_future_dec = SAD_AVX2(h->fdec->plane[0], closest_future_frame->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
-            i_motion_approx_future_enc = SAD_AVX2(h->fenc->plane[0], closest_future_frame->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
+            i_motion_approx_future_dec = h->pvmaf_f.SAD_pvmaf(h->fdec->plane[0], closest_future_frame->plane[0], h->fdec->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
+            i_motion_approx_future_enc = h->pvmaf_f.SAD_pvmaf(h->fenc->plane[0], closest_future_frame->plane[0], h->fenc->i_stride[0], h->param.i_width, h->param.i_height);// /h->mb.i_mb_count;
             i_motion_approx_future_offset = h->fenc->i_frame - closest_future_frame->i_frame;
         }
 

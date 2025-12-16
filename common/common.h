@@ -279,6 +279,16 @@ typedef struct
     // int scenecut_flag;
 } x264_frame_stat_t;
 
+typedef struct
+{
+    void (*calculate_blurriness)(pixel* src, int pitch, int width, int height, int step, float* blur);
+    void (*calculate_si)(pixel* src, int pitch, int width, int height, int step, float* si);
+    void (*ModelInference)(float* NormalizedFeature, float* intLayer[], const float* weight[], const float* bias[], const int* layer_dim, int layers_count);
+    void (*NormalizeInput)(float* feature, float* mean, float* std, float* norm, int input_dim);
+    void (*ClipInput)(float* feature, float* clipped_feature, float* clip, int input_dim);
+    int64_t (*SAD_pvmaf)(pixel* sour, pixel* dist, int pitch, int width, int height);
+}x264_pvmaf_functions_t;
+
 struct x264_t
 {
     /* encoder parameters */
@@ -785,6 +795,7 @@ struct x264_t
     x264_quant_function_t quantf;
     x264_deblock_function_t loopf;
     x264_bitstream_function_t bsf;
+    x264_pvmaf_functions_t pvmaf_f;
 
     x264_lookahead_t *lookahead;
 
